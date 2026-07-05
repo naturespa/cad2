@@ -15,6 +15,8 @@ Then open `http://localhost:8000`.
 ## Features
 
 - Japanese text prompt to create common printable shapes
+- Server-side reference lookup from the internet before generation, with an offline fallback
+- Composite generation for less predefined requests, such as plates with holes, bases with parts, roofs, legs, handles, stairs, cones, pyramids, and polygon prisms
 - Interactive 3D preview with orbit controls
 - STL export for 3D printers
 

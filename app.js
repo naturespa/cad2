@@ -137,10 +137,313 @@ function createRing(outerRadius, innerRadius, thickness) {
   ring.scale.y = thickness / (tube * 2);
 }
 
+function createSolidBox(width, depth, height) {
+  boxPart(width, height, depth, 0, height / 2, 0);
+}
+
+function createCone(diameter, height) {
+  addMesh(new THREE.ConeGeometry(diameter / 2, height, 64), materials.body, [0, height / 2, 0]);
+}
+
+function createPyramid(width, depth, height) {
+  const geometry = new THREE.ConeGeometry(Math.max(width, depth) / Math.SQRT2, height, 4);
+  const pyramid = addMesh(geometry, materials.body, [0, height / 2, 0]);
+  pyramid.scale.x = width / Math.max(width, depth);
+  pyramid.scale.z = depth / Math.max(width, depth);
+  pyramid.rotation.y = Math.PI / 4;
+}
+
+function createPrism(sides, diameter, height) {
+  addMesh(new THREE.CylinderGeometry(diameter / 2, diameter / 2, height, sides), materials.body, [0, height / 2, 0]);
+}
+
+function createPlateWithHole(width, depth, thickness, holeDiameter) {
+  const shape = new THREE.Shape();
+  shape.moveTo(-width / 2, -depth / 2);
+  shape.lineTo(width / 2, -depth / 2);
+  shape.lineTo(width / 2, depth / 2);
+  shape.lineTo(-width / 2, depth / 2);
+  shape.lineTo(-width / 2, -depth / 2);
+
+  if (holeDiameter > 0) {
+    const hole = new THREE.Path();
+    hole.absellipse(0, 0, holeDiameter / 2, holeDiameter / 2, 0, Math.PI * 2, false);
+    shape.holes.push(hole);
+  }
+
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
+  addMesh(geometry, materials.body, [0, thickness, 0], [-Math.PI / 2, 0, 0]);
+}
+
+function createUHandle(width, height, depth, yOffset = 0) {
+  const postRadius = Math.max(2, Math.min(width, height) * 0.08);
+  addMesh(new THREE.CylinderGeometry(postRadius, postRadius, height, 24), materials.accent, [-width / 2, yOffset + height / 2, depth / 2]);
+  addMesh(new THREE.CylinderGeometry(postRadius, postRadius, height, 24), materials.accent, [width / 2, yOffset + height / 2, depth / 2]);
+  addMesh(
+    new THREE.CylinderGeometry(postRadius, postRadius, width, 24),
+    materials.accent,
+    [0, yOffset + height, depth / 2],
+    [0, 0, Math.PI / 2],
+  );
+}
+
+function createFourLegs(width, depth, height, radius) {
+  const x = width / 2 - radius * 2;
+  const z = depth / 2 - radius * 2;
+  [[-x, -z], [x, -z], [-x, z], [x, z]].forEach(([legX, legZ]) => {
+    addMesh(new THREE.CylinderGeometry(radius, radius, height, 24), materials.dark, [legX, height / 2, legZ]);
+  });
+}
+
+function createStairs(width, depth, height, steps) {
+  const stepDepth = depth / steps;
+  const stepHeight = height / steps;
+  for (let i = 0; i < steps; i += 1) {
+    const blockHeight = stepHeight * (i + 1);
+    const z = -depth / 2 + stepDepth * i + stepDepth / 2;
+    boxPart(width, blockHeight, stepDepth, 0, blockHeight / 2, z, i % 2 ? materials.body : materials.accent);
+  }
+}
+
+function createRoof(width, depth, height, yOffset = 0) {
+  const geometry = new THREE.BufferGeometry();
+  const w = width / 2;
+  const d = depth / 2;
+  const vertices = new Float32Array([
+    -w, 0, -d, w, 0, -d, 0, height, -d,
+    -w, 0, d, 0, height, d, w, 0, d,
+    -w, 0, -d, -w, 0, d, w, 0, d,
+    -w, 0, -d, w, 0, d, w, 0, -d,
+    -w, 0, -d, 0, height, -d, 0, height, d,
+    -w, 0, -d, 0, height, d, -w, 0, d,
+    w, 0, -d, w, 0, d, 0, height, d,
+    w, 0, -d, 0, height, d, 0, height, -d,
+  ]);
+  geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
+  addMesh(geometry, materials.accent, [0, yOffset, 0]);
+}
+
+function createChair(width, depth, height) {
+  const seatHeight = Math.max(20, height * 0.42);
+  const seatThickness = Math.max(5, height * 0.08);
+  createFourLegs(width, depth, seatHeight, Math.max(2.5, Math.min(width, depth) * 0.045));
+  boxPart(width, seatThickness, depth, 0, seatHeight + seatThickness / 2, 0, materials.body);
+  boxPart(width, height - seatHeight, Math.max(5, depth * 0.12), 0, seatHeight + (height - seatHeight) / 2, depth / 2, materials.accent);
+}
+
+function createTable(width, depth, height) {
+  const topThickness = Math.max(5, height * 0.1);
+  createFourLegs(width, depth, height - topThickness, Math.max(3, Math.min(width, depth) * 0.045));
+  boxPart(width, topThickness, depth, 0, height - topThickness / 2, 0, materials.body);
+}
+
+function createHouse(width, depth, height) {
+  const bodyHeight = height * 0.68;
+  createSolidBox(width, depth, bodyHeight);
+  createRoof(width * 1.12, depth * 1.12, height - bodyHeight, bodyHeight);
+  boxPart(width * 0.22, bodyHeight * 0.42, 3, 0, bodyHeight * 0.21, -depth / 2 - 1.5, materials.dark);
+  boxPart(width * 0.18, bodyHeight * 0.18, 3, -width * 0.26, bodyHeight * 0.55, -depth / 2 - 1.5, materials.accent);
+  boxPart(width * 0.18, bodyHeight * 0.18, 3, width * 0.26, bodyHeight * 0.55, -depth / 2 - 1.5, materials.accent);
+}
+
+function createVehicle(width, depth, height) {
+  const wheelRadius = Math.max(5, Math.min(width, depth) * 0.1);
+  boxPart(width, height * 0.42, depth, 0, wheelRadius + height * 0.21, 0, materials.body);
+  boxPart(width * 0.48, height * 0.34, depth * 0.72, width * 0.05, wheelRadius + height * 0.59, 0, materials.accent);
+  [[-width * 0.32, -depth / 2 - 1], [width * 0.32, -depth / 2 - 1], [-width * 0.32, depth / 2 + 1], [width * 0.32, depth / 2 + 1]].forEach(([x, z]) => {
+    addMesh(new THREE.CylinderGeometry(wheelRadius, wheelRadius, 5, 32), materials.dark, [x, wheelRadius, z], [Math.PI / 2, 0, 0]);
+  });
+}
+
+function createAirplane(width, depth, height) {
+  addMesh(new THREE.CylinderGeometry(height * 0.16, height * 0.2, width, 32), materials.body, [0, height * 0.48, 0], [0, 0, Math.PI / 2]);
+  boxPart(width * 0.42, Math.max(3, height * 0.06), depth, 0, height * 0.48, 0, materials.accent);
+  boxPart(width * 0.18, Math.max(3, height * 0.05), depth * 0.45, -width * 0.42, height * 0.66, 0, materials.accent);
+  createCone(height * 0.34, width * 0.18);
+  modelGroup.children.at(-1).position.set(width * 0.58, height * 0.48, 0);
+  modelGroup.children.at(-1).rotation.z = -Math.PI / 2;
+}
+
+function createBoat(width, depth, height) {
+  createPrism(3, Math.max(width, depth), height * 0.42);
+  const hull = modelGroup.children.at(-1);
+  hull.scale.z = depth / Math.max(width, depth);
+  hull.position.y = height * 0.21;
+  hull.rotation.z = Math.PI;
+  boxPart(width * 0.55, height * 0.28, depth * 0.52, 0, height * 0.55, 0, materials.accent);
+}
+
+function createAnimal(width, depth, height) {
+  addMesh(new THREE.SphereGeometry(Math.min(width, depth) * 0.26, 32, 16), materials.body, [0, height * 0.48, 0]);
+  addMesh(new THREE.SphereGeometry(Math.min(width, depth) * 0.18, 32, 16), materials.accent, [width * 0.34, height * 0.6, 0]);
+  createFourLegs(width * 0.72, depth * 0.62, height * 0.34, Math.max(2.5, Math.min(width, depth) * 0.045));
+  addMesh(new THREE.CylinderGeometry(2.5, 2.5, width * 0.32, 16), materials.dark, [-width * 0.34, height * 0.6, 0], [0, 0, Math.PI / 3]);
+  if (height > 35) {
+    createCone(Math.min(width, depth) * 0.14, height * 0.18);
+    modelGroup.children.at(-1).position.set(width * 0.3, height * 0.82, -depth * 0.08);
+    createCone(Math.min(width, depth) * 0.14, height * 0.18);
+    modelGroup.children.at(-1).position.set(width * 0.3, height * 0.82, depth * 0.08);
+  }
+}
+
+function baseDimensions(normalized, values) {
+  return {
+    width: valueAfter(normalized, ["幅", "横"], values[0] || 80),
+    depth: valueAfter(normalized, ["奥行き", "奥行", "深さ"], values[1] || 50),
+    height: valueAfter(normalized, ["高さ", "縦"], values[2] || 30),
+  };
+}
+
+function buildCompositeModel(normalized, values) {
+  const has = (...words) => words.some((word) => normalized.includes(word));
+  const { width, depth, height } = baseDimensions(normalized, values);
+  const made = [];
+
+  if (has("椅子", "イス", "いす", "チェア", "chair", "座面", "背もたれ")) {
+    createChair(width, depth, height);
+    made.push("椅子");
+  }
+
+  if (has("机", "テーブル", "デスク", "table", "desk", "天板")) {
+    createTable(width, depth, height);
+    made.push("テーブル");
+  }
+
+  if (has("家", "住宅", "建物", "小屋", "house", "home", "屋根")) {
+    createHouse(width, depth, height);
+    made.push("家");
+  }
+
+  if (
+    has("自動車", "カー", "car", "vehicle", "タイヤ", "車輪") ||
+    (has("車") && !has("椅子", "イス", "いす", "チェア", "飛行機", "航空機", "船", "ボート"))
+  ) {
+    createVehicle(width, depth, height);
+    made.push("車");
+  }
+
+  if (has("飛行機", "航空機", "airplane", "aircraft", "翼")) {
+    createAirplane(width, depth, height);
+    made.push("飛行機");
+  }
+
+  if (has("船", "ボート", "boat", "ship", "舟")) {
+    createBoat(width, depth, height);
+    made.push("船");
+  }
+
+  if (has("猫", "犬", "動物", "animal", "ネコ", "イヌ")) {
+    createAnimal(width, depth, height);
+    made.push("動物");
+  }
+
+  if (has("階段", "段々", "段差")) {
+    createStairs(width, depth, height, Math.round(valueAfter(normalized, ["段"], 4)));
+    made.push("階段");
+  }
+
+  if (has("板", "プレート", "パネル", "札")) {
+    const thickness = valueAfter(normalized, ["厚さ"], Math.min(8, Math.max(3, height)));
+    const hole = has("穴", "孔") ? valueAfter(normalized, ["穴", "内径", "直径"], Math.min(width, depth) * 0.28) : 0;
+    createPlateWithHole(width, depth, thickness, hole);
+    made.push(hole ? "穴あき板" : "板");
+  }
+
+  if (has("台座", "土台", "ベース", "台")) {
+    boxPart(width, Math.max(6, height * 0.18), depth, 0, Math.max(6, height * 0.18) / 2, 0, materials.dark);
+    made.push("台座");
+  }
+
+  if (has("箱", "四角", "直方体", "ブロック")) {
+    createSolidBox(width, depth, height);
+    made.push("箱");
+  }
+
+  if (has("円すい", "円錐", "コーン")) {
+    const diameter = valueAfter(normalized, ["直径", "径"], Math.min(width, depth));
+    createCone(diameter, height);
+    made.push("円すい");
+  }
+
+  if (has("ピラミッド", "四角すい", "四角錐")) {
+    createPyramid(width, depth, height);
+    made.push("ピラミッド");
+  }
+
+  if (has("三角柱")) {
+    createPrism(3, valueAfter(normalized, ["直径", "幅"], width), height);
+    made.push("三角柱");
+  } else if (has("六角", "六角柱")) {
+    createPrism(6, valueAfter(normalized, ["直径", "幅"], width), height);
+    made.push("六角柱");
+  }
+
+  if (has("円柱", "丸棒", "棒")) {
+    const diameter = valueAfter(normalized, ["直径", "径"], Math.min(width, depth));
+    createCylinder(diameter / 2, height);
+    made.push("円柱");
+  }
+
+  if (has("球", "ボール", "丸")) {
+    const diameter = valueAfter(normalized, ["直径", "径"], Math.min(width, depth, height));
+    createSphere(diameter / 2);
+    made.push("球");
+  }
+
+  if (has("屋根") && !made.includes("家")) {
+    createRoof(width * 1.12, depth * 1.12, Math.max(14, height * 0.35), height);
+    made.push("屋根");
+  }
+
+  if (has("足", "脚")) {
+    createFourLegs(width, depth, Math.max(18, height * 0.55), Math.max(3, Math.min(width, depth) * 0.06));
+    if (!has("板", "プレート", "台座", "土台", "ベース")) {
+      boxPart(width, Math.max(5, height * 0.12), depth, 0, Math.max(18, height * 0.55) + Math.max(5, height * 0.12) / 2, 0, materials.body);
+    }
+    made.push("4本足");
+  }
+
+  if (has("取っ手", "持ち手", "ハンドル")) {
+    createUHandle(Math.min(width * 0.72, 70), Math.max(18, height * 0.45), Math.min(depth * 0.6, 40), height);
+    made.push("取っ手");
+  }
+
+  if (!made.length) {
+    createSolidBox(width, depth, height);
+    if (values.length >= 4) {
+      createCylinder((values[3] || 20) / 2, Math.max(12, height * 0.45));
+      modelGroup.children.at(-1).position.y += height;
+      made.push("自由形状");
+    } else {
+      made.push("基本形状");
+    }
+  }
+
+  return {
+    type: made.join(" + "),
+    size: `${width} x ${depth} x ${height} mm`,
+  };
+}
+
 function buildFromPrompt(text) {
   const normalized = text.replace(/\s+/g, "");
   const values = numberList(text);
   const has = (...words) => words.some((word) => normalized.includes(word));
+  const compositeTerms = [
+    "板", "プレート", "パネル", "札", "穴", "孔", "台座", "土台", "ベース", "台",
+    "箱", "四角", "直方体", "ブロック", "円すい", "円錐", "コーン", "ピラミッド",
+    "四角すい", "四角錐", "三角柱", "六角", "屋根", "足", "脚", "取っ手", "持ち手",
+    "ハンドル", "階段", "段々", "段差", "椅子", "イス", "いす", "チェア",
+    "机", "テーブル", "デスク", "家", "住宅", "建物", "小屋", "車", "自動車",
+    "カー", "タイヤ", "車輪", "飛行機", "航空機", "翼", "船", "ボート", "猫",
+    "犬", "動物", "animal",
+  ];
+  const matchedCompositeTerms = compositeTerms.filter((term) => normalized.includes(term));
+  const looksComposed = matchedCompositeTerms.length > 1 || ["と", "付き", "つき", "に", "上に", "乗せ"].some((term) => normalized.includes(term));
+
+  if (matchedCompositeTerms.length && looksComposed) {
+    return buildCompositeModel(normalized, values);
+  }
 
   if (has("スマホ", "スマートフォン", "携帯", "スタンド")) {
     const width = valueAfter(normalized, ["幅", "横"], values[0] || 72);
@@ -179,6 +482,10 @@ function buildFromPrompt(text) {
     return { type: "円柱", size: `直径${diameter} 高さ${height} mm` };
   }
 
+  if (matchedCompositeTerms.length) {
+    return buildCompositeModel(normalized, values);
+  }
+
   const width = valueAfter(normalized, ["幅", "横"], values[0] || 80);
   const depth = valueAfter(normalized, ["奥行き", "奥行", "深さ"], values[1] || 50);
   const height = valueAfter(normalized, ["高さ", "縦"], values[2] || 30);
@@ -198,16 +505,45 @@ function fitCamera() {
   controls.update();
 }
 
-function generateModel() {
-  clearModel();
-  const prompt = promptInput.value.trim() || "幅80mm 奥行き50mm 高さ30mm の小物入れ";
-  const result = buildFromPrompt(prompt);
-  currentName = `cad2-${result.type}`;
-  modelType.textContent = result.type;
-  modelSize.textContent = result.size;
-  partCount.textContent = `${modelGroup.children.length}`;
-  message.textContent = "モデルを生成しました。ドラッグで回転、ホイールで拡大できます。";
-  fitCamera();
+async function fetchReferences(prompt) {
+  try {
+    const response = await fetch(`/api/reference?q=${encodeURIComponent(prompt)}`);
+    if (!response.ok) {
+      return [];
+    }
+    const payload = await response.json();
+    return payload.references || [];
+  } catch {
+    return [];
+  }
+}
+
+function enrichPrompt(prompt, references) {
+  const referenceText = references
+    .map((reference) => `${reference.title || ""} ${reference.text || ""}`)
+    .join(" ");
+  return `${prompt} ${referenceText}`;
+}
+
+async function generateModel() {
+  generateButton.disabled = true;
+  message.textContent = "インターネットで形の参考情報を探しています。";
+  try {
+    clearModel();
+    const prompt = promptInput.value.trim() || "幅80mm 奥行き50mm 高さ30mm の小物入れ";
+    const references = await fetchReferences(prompt);
+    const result = buildFromPrompt(enrichPrompt(prompt, references));
+    currentName = `cad2-${result.type}`;
+    modelType.textContent = result.type;
+    modelSize.textContent = result.size;
+    partCount.textContent = `${modelGroup.children.length}`;
+    message.textContent = references.length
+      ? `Web参照を使ってモデルを生成しました: ${references.map((reference) => reference.source).join(" / ")}`
+      : "Web参照が使えなかったため、手元の形状ルールでモデルを生成しました。";
+    fitCamera();
+  } finally {
+    generateButton.disabled = false;
+  }
 }
 
 function triangleToStl(a, b, c) {
@@ -225,9 +561,9 @@ function triangleToStl(a, b, c) {
   ].join("\n");
 }
 
-function exportStl() {
+async function exportStl() {
   if (!modelGroup.children.length) {
-    generateModel();
+    await generateModel();
   }
 
   modelGroup.updateMatrixWorld(true);
