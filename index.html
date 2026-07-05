@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>cad2</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="control-pane" aria-label="モデル作成">
+        <div class="brand-row">
+          <div>
+            <p class="eyebrow">cad2</p>
+            <h1>日本語で作る3DプリントCAD</h1>
+          </div>
+          <button id="downloadButton" class="icon-button" type="button" aria-label="STLを保存" title="STLを保存">
+            <span aria-hidden="true">STL</span>
+          </button>
+        </div>
+
+        <label class="prompt-label" for="promptInput">作りたいもの</label>
+        <textarea id="promptInput" spellcheck="false">幅80mm 奥行き50mm 高さ30mm の小物入れを作って</textarea>
+
+        <div class="button-row">
+          <button id="generateButton" class="primary-button" type="button">生成</button>
+          <button class="ghost-button" type="button" data-example="直径40mm 高さ70mm の円柱を作って">円柱</button>
+          <button class="ghost-button" type="button" data-example="幅90mm 奥行き60mm 高さ25mm の小物入れ">小物入れ</button>
+          <button class="ghost-button" type="button" data-example="幅70mm 高さ90mm のスマホスタンド">スタンド</button>
+          <button class="ghost-button" type="button" data-example="外径50mm 内径25mm 厚さ8mm のリング">リング</button>
+        </div>
+
+        <dl class="model-facts">
+          <div>
+            <dt>種類</dt>
+            <dd id="modelType">-</dd>
+          </div>
+          <div>
+            <dt>寸法</dt>
+            <dd id="modelSize">-</dd>
+          </div>
+          <div>
+            <dt>部品</dt>
+            <dd id="partCount">-</dd>
+          </div>
+        </dl>
+
+        <p id="message" class="message" role="status"></p>
+      </section>
+
+      <section class="viewer-pane" aria-label="3Dプレビュー">
+        <canvas id="modelCanvas"></canvas>
+        <div class="view-badge">mm</div>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
