@@ -2,6 +2,23 @@
 
 Browser-based CAD helper for making simple 3D-printable STL models from Japanese text.
 
+## Offline Windows app
+
+Run:
+
+```bat
+RunCad2Offline.cmd
+```
+
+This opens a local Windows desktop app. It does not use a browser, server, or internet connection.
+
+The offline app supports:
+
+- Japanese text input
+- 3D preview with mouse drag rotation
+- STL export
+- Built-in shape generation for globes, chairs, tables, houses, vehicles, airplanes, boats, animals, cylinders, spheres, and boxes
+
 ## Run
 
 Serve the folder locally:
