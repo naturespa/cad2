@@ -13,8 +13,21 @@ const types = {
   ".stl": "model/stl",
 };
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 6000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function fetchJson(url) {
-  const result = await fetch(url, {
+  const result = await fetchWithTimeout(url, {
     headers: {
       "Accept": "application/json",
       "User-Agent": "cad2-local-reference/1.0",
@@ -29,7 +42,7 @@ async function fetchJson(url) {
 }
 
 async function fetchText(url) {
-  const result = await fetch(url, {
+  const result = await fetchWithTimeout(url, {
     headers: {
       "Accept": "text/html,application/xhtml+xml",
       "Accept-Language": "ja,en;q=0.8",
@@ -76,6 +89,12 @@ function parseDuckSearchHtml(html, limit = 5) {
   }
 
   return results;
+}
+
+function timeoutValue(ms, value) {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(value), ms);
+  });
 }
 
 function flattenDuckTopics(topics, output = []) {
@@ -147,7 +166,10 @@ createServer(async (request, response) => {
     }
 
     try {
-      const references = await referenceSearch(query);
+      const references = await Promise.race([
+        referenceSearch(query),
+        timeoutValue(5000, []),
+      ]);
       response.writeHead(200);
       response.end(JSON.stringify({ ok: true, query, references }));
     } catch (error) {

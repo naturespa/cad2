@@ -571,12 +571,14 @@ function referenceQueryFromPrompt(prompt) {
 }
 
 async function fetchReferences(prompt) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 7000);
   try {
     const query = referenceQueryFromPrompt(prompt);
     if (!query) {
       return [];
     }
-    const response = await fetch(`/api/reference?q=${encodeURIComponent(query)}`);
+    const response = await fetch(`/api/reference?q=${encodeURIComponent(query)}`, { signal: controller.signal });
     if (!response.ok) {
       return [];
     }
@@ -584,6 +586,8 @@ async function fetchReferences(prompt) {
     return payload.references || [];
   } catch {
     return [];
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
