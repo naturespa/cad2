@@ -28,6 +28,56 @@ async function fetchJson(url) {
   return result.json();
 }
 
+async function fetchText(url) {
+  const result = await fetch(url, {
+    headers: {
+      "Accept": "text/html,application/xhtml+xml",
+      "Accept-Language": "ja,en;q=0.8",
+      "User-Agent": "Mozilla/5.0 cad2-local-reference/1.0",
+    },
+  });
+
+  if (!result.ok) {
+    throw new Error(`HTTP ${result.status}`);
+  }
+
+  return result.text();
+}
+
+function decodeHtml(value) {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&#x2F;/g, "/")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
+}
+
+function cleanHtml(value) {
+  return decodeHtml(String(value || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim());
+}
+
+function parseDuckSearchHtml(html, limit = 5) {
+  const results = [];
+  const resultPattern = /<a[^>]+class="[^"]*result__a[^"]*"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+
+  for (const match of html.matchAll(resultPattern)) {
+    const title = cleanHtml(match[1]);
+    const text = cleanHtml(match[2]);
+    if (title || text) {
+      results.push({ source: "Web検索", title, text });
+    }
+    if (results.length >= limit) {
+      break;
+    }
+  }
+
+  return results;
+}
+
 function flattenDuckTopics(topics, output = []) {
   for (const topic of topics || []) {
     if (topic.Text) {
@@ -41,25 +91,20 @@ function flattenDuckTopics(topics, output = []) {
 }
 
 async function referenceSearch(query) {
+  const duckSearchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(`${query} 形状 構造`)}`;
   const wikiSearchUrl = `https://ja.wikipedia.org/w/api.php?action=query&list=search&format=json&origin=*&srlimit=1&srsearch=${encodeURIComponent(query)}`;
   const duckUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
 
-  const [wikiResult, duckResult] = await Promise.allSettled([
-    fetchJson(wikiSearchUrl),
+  const [searchResult, duckResult, wikiResult] = await Promise.allSettled([
+    fetchText(duckSearchUrl),
     fetchJson(duckUrl),
+    fetchJson(wikiSearchUrl),
   ]);
 
   const references = [];
 
-  if (wikiResult.status === "fulfilled") {
-    const page = wikiResult.value?.query?.search?.[0];
-    if (page?.title) {
-      references.push({
-        source: "Wikipedia",
-        title: page.title,
-        text: String(page.snippet || "").replace(/<[^>]*>/g, ""),
-      });
-    }
+  if (searchResult.status === "fulfilled") {
+    references.push(...parseDuckSearchHtml(searchResult.value));
   }
 
   if (duckResult.status === "fulfilled") {
@@ -70,6 +115,17 @@ async function referenceSearch(query) {
         source: "DuckDuckGo",
         title: duck.Heading || query,
         text: [duck.AbstractText, ...related].filter(Boolean).join(" "),
+      });
+    }
+  }
+
+  if (wikiResult.status === "fulfilled") {
+    const page = wikiResult.value?.query?.search?.[0];
+    if (page?.title) {
+      references.push({
+        source: "Wikipedia",
+        title: page.title,
+        text: String(page.snippet || "").replace(/<[^>]*>/g, ""),
       });
     }
   }

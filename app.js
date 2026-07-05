@@ -286,6 +286,31 @@ function createAnimal(width, depth, height) {
   }
 }
 
+function createGlobeStand(width, depth, height) {
+  const baseHeight = Math.max(5, height * 0.12);
+  const globeRadius = Math.min(width, depth, height * 0.72) * 0.32;
+  const globeY = baseHeight + globeRadius + Math.max(8, height * 0.12);
+  const postRadius = Math.max(2, globeRadius * 0.08);
+
+  boxPart(width * 0.82, baseHeight, depth * 0.72, 0, baseHeight / 2, 0, materials.dark);
+  addMesh(new THREE.CylinderGeometry(postRadius, postRadius, globeY - baseHeight, 24), materials.dark, [0, (globeY + baseHeight) / 2, 0]);
+  addMesh(new THREE.SphereGeometry(globeRadius, 64, 32), materials.body, [0, globeY, 0]);
+
+  const meridian = addMesh(
+    new THREE.TorusGeometry(globeRadius * 1.08, Math.max(1.4, globeRadius * 0.045), 16, 96),
+    materials.accent,
+    [0, globeY, 0],
+    [Math.PI / 2, 0, 0],
+  );
+  meridian.rotation.z = THREE.MathUtils.degToRad(18);
+
+  addMesh(
+    new THREE.CylinderGeometry(postRadius, postRadius, globeRadius * 1.15, 24),
+    materials.accent,
+    [0, globeY - globeRadius * 0.58, 0],
+  );
+}
+
 function baseDimensions(normalized, values) {
   return {
     width: valueAfter(normalized, ["幅", "横"], values[0] || 80),
@@ -299,6 +324,11 @@ function buildCompositeModel(normalized, values) {
   const { width, depth, height } = baseDimensions(normalized, values);
   const made = [];
 
+  if (has("地球儀", "グローブ", "globe")) {
+    createGlobeStand(width, depth, height);
+    made.push("地球儀スタンド");
+  }
+
   if (has("椅子", "イス", "いす", "チェア", "chair", "座面", "背もたれ")) {
     createChair(width, depth, height);
     made.push("椅子");
@@ -310,8 +340,10 @@ function buildCompositeModel(normalized, values) {
   }
 
   if (has("家", "住宅", "建物", "小屋", "house", "home", "屋根")) {
-    createHouse(width, depth, height);
-    made.push("家");
+    if (!made.includes("地球儀スタンド")) {
+      createHouse(width, depth, height);
+      made.push("家");
+    }
   }
 
   if (
@@ -350,8 +382,10 @@ function buildCompositeModel(normalized, values) {
   }
 
   if (has("台座", "土台", "ベース", "台")) {
-    boxPart(width, Math.max(6, height * 0.18), depth, 0, Math.max(6, height * 0.18) / 2, 0, materials.dark);
-    made.push("台座");
+    if (!made.includes("地球儀スタンド")) {
+      boxPart(width, Math.max(6, height * 0.18), depth, 0, Math.max(6, height * 0.18) / 2, 0, materials.dark);
+      made.push("台座");
+    }
   }
 
   if (has("箱", "四角", "直方体", "ブロック")) {
@@ -384,7 +418,7 @@ function buildCompositeModel(normalized, values) {
     made.push("円柱");
   }
 
-  if (has("球", "ボール", "丸")) {
+  if (has("球", "ボール", "丸") && !made.includes("地球儀スタンド")) {
     const diameter = valueAfter(normalized, ["直径", "径"], Math.min(width, depth, height));
     createSphere(diameter / 2);
     made.push("球");
@@ -425,11 +459,14 @@ function buildCompositeModel(normalized, values) {
   };
 }
 
-function buildFromPrompt(text) {
-  const normalized = text.replace(/\s+/g, "");
+function buildFromPrompt(text, referenceText = "") {
+  const promptOnly = text.replace(/\s+/g, "");
   const values = numberList(text);
+  let normalized = promptOnly;
   const has = (...words) => words.some((word) => normalized.includes(word));
+  const promptHas = (...words) => words.some((word) => promptOnly.includes(word));
   const compositeTerms = [
+    "地球儀", "グローブ", "globe", "スタンド",
     "板", "プレート", "パネル", "札", "穴", "孔", "台座", "土台", "ベース", "台",
     "箱", "四角", "直方体", "ブロック", "円すい", "円錐", "コーン", "ピラミッド",
     "四角すい", "四角錐", "三角柱", "六角", "屋根", "足", "脚", "取っ手", "持ち手",
@@ -438,14 +475,20 @@ function buildFromPrompt(text) {
     "カー", "タイヤ", "車輪", "飛行機", "航空機", "翼", "船", "ボート", "猫",
     "犬", "動物", "animal",
   ];
-  const matchedCompositeTerms = compositeTerms.filter((term) => normalized.includes(term));
+  let matchedCompositeTerms = compositeTerms.filter((term) => normalized.includes(term));
+
+  if (!matchedCompositeTerms.length && referenceText) {
+    normalized = `${text} ${referenceText}`.replace(/\s+/g, "");
+    matchedCompositeTerms = compositeTerms.filter((term) => normalized.includes(term));
+  }
+
   const looksComposed = matchedCompositeTerms.length > 1 || ["と", "付き", "つき", "に", "上に", "乗せ"].some((term) => normalized.includes(term));
 
   if (matchedCompositeTerms.length && looksComposed) {
     return buildCompositeModel(normalized, values);
   }
 
-  if (has("スマホ", "スマートフォン", "携帯", "スタンド")) {
+  if (promptHas("スマホ", "スマートフォン", "携帯")) {
     const width = valueAfter(normalized, ["幅", "横"], values[0] || 72);
     const height = valueAfter(normalized, ["高さ", "縦"], values[1] || 92);
     const depth = valueAfter(normalized, ["奥行き", "奥行", "深さ"], values[2] || 62);
@@ -505,9 +548,35 @@ function fitCamera() {
   controls.update();
 }
 
+function referenceQueryFromPrompt(prompt) {
+  const knownObjects = [
+    "地球儀", "グローブ", "スマホスタンド", "スマートフォンスタンド", "椅子", "イス",
+    "机", "テーブル", "家", "小屋", "飛行機", "航空機", "船", "ボート", "車",
+    "自動車", "猫", "犬", "動物", "フック", "リング", "小物入れ", "箱", "階段",
+    "ピラミッド", "円すい", "円柱", "球",
+  ];
+  const compact = prompt.replace(/\s+/g, "");
+  const found = knownObjects.find((word) => compact.includes(word));
+  if (found) {
+    return found;
+  }
+
+  return prompt
+    .replace(/\d+(?:\.\d+)?\s*(mm|ミリ|cm|センチ)?/gi, " ")
+    .replace(/幅|横|奥行き|奥行|深さ|高さ|縦|厚さ|直径|外径|内径/g, " ")
+    .replace(/作って|つくって|ほしい|もの|ある|付き|つき|の|で|を|に/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 40);
+}
+
 async function fetchReferences(prompt) {
   try {
-    const response = await fetch(`/api/reference?q=${encodeURIComponent(prompt)}`);
+    const query = referenceQueryFromPrompt(prompt);
+    if (!query) {
+      return [];
+    }
+    const response = await fetch(`/api/reference?q=${encodeURIComponent(query)}`);
     if (!response.ok) {
       return [];
     }
@@ -522,7 +591,7 @@ function enrichPrompt(prompt, references) {
   const referenceText = references
     .map((reference) => `${reference.title || ""} ${reference.text || ""}`)
     .join(" ");
-  return `${prompt} ${referenceText}`;
+  return referenceText;
 }
 
 async function generateModel() {
@@ -532,13 +601,14 @@ async function generateModel() {
     clearModel();
     const prompt = promptInput.value.trim() || "幅80mm 奥行き50mm 高さ30mm の小物入れ";
     const references = await fetchReferences(prompt);
-    const result = buildFromPrompt(enrichPrompt(prompt, references));
+    const result = buildFromPrompt(prompt, enrichPrompt(prompt, references));
     currentName = `cad2-${result.type}`;
     modelType.textContent = result.type;
     modelSize.textContent = result.size;
     partCount.textContent = `${modelGroup.children.length}`;
+    const sources = [...new Set(references.map((reference) => reference.source))].join(" / ");
     message.textContent = references.length
-      ? `Web参照を使ってモデルを生成しました: ${references.map((reference) => reference.source).join(" / ")}`
+      ? `Web参照を使ってモデルを生成しました: ${sources}`
       : "Web参照が使えなかったため、手元の形状ルールでモデルを生成しました。";
     fitCamera();
   } finally {
